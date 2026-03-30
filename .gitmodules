@@ -1,0 +1,7 @@
+[submodule "apps/api"]
+	path = apps/api
+	url = git@github.com:KOngphob03/engenius-project-api.git
+
+[submodule "apps/web"]
+	path = apps/web
+	url = git@github.com:KOngphob03/engenius-project-web.git
