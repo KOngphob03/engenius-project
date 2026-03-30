@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd:*)",
+      "Bash(bun run:*)",
+      "Bash(curl -X POST http://localhost:3000/auth/request-otp -H \"Content-Type: application/json\" -d \"{\"\"email\"\":\"\"test@test.com\"\"}\")",
+      "Bash(curl http://localhost:3000/)",
+      "Bash(curl -v http://localhost:3000/)",
+      "Bash(curl -v -X OPTIONS http://localhost:3000/auth/request-otp -H \"Origin: http://localhost:3001\" -H \"Access-Control-Request-Method: POST\")",
+      "Bash(curl:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run:*)",
+      "Bash(bunx tsc:*)"
+    ]
+  }
+}
