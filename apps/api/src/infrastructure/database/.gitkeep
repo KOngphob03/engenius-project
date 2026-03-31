@@ -1,0 +1,12 @@
+# Database Infrastructure
+
+This folder contains database-related implementations.
+
+## Structure
+- `drizzle/` - Drizzle schema, migrations, config
+- `repositories/` - Repository implementations (implements ports from core)
+
+## Rules
+- Implements repository interfaces from Core
+- Can use Drizzle ORM
+- Contains all database-specific code

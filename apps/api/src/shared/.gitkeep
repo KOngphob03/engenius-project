@@ -1,0 +1,13 @@
+# Shared Utilities
+
+This folder contains shared utilities and configurations.
+
+## Structure
+- `config/` - App configuration (env, constants)
+- `utils/` - Helper functions
+- `types/` - Shared type definitions
+
+## Rules
+- Generic utilities that can be used anywhere
+- NO business logic
+- NO framework-specific code

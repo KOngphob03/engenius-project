@@ -1,0 +1,13 @@
+# Ports Layer
+
+This folder contains interfaces (ports) for external interactions.
+
+## Structure
+- `repositories/` - Repository interfaces for data access
+- `services/` - Service interfaces for external services
+
+## Rules
+- Define interfaces ONLY
+- NO implementations
+- NO external dependencies
+- Core defines the contract

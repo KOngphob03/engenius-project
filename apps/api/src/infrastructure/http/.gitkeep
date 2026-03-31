@@ -1,0 +1,12 @@
+# HTTP Infrastructure
+
+This folder contains HTTP-related implementations.
+
+## Structure
+- `routes/` - Elysia route definitions
+- `controllers/` - Request handlers that call use cases
+
+## Rules
+- Thin layer - delegate to use cases
+- Handle HTTP concerns (validation, parsing)
+- Use Elysia framework

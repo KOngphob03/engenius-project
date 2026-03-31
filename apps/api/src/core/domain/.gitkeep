@@ -1,0 +1,13 @@
+# Domain Layer
+
+This folder contains core business entities, value objects, and domain events.
+
+## Structure
+- `entities/` - Core business objects with identity
+- `value-objects/` - Immutable values without identity
+- `events/` - Domain events
+
+## Rules
+- NO external dependencies
+- Pure TypeScript/JavaScript
+- Framework agnostic
