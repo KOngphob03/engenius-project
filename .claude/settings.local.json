@@ -10,7 +10,9 @@
       "Bash(curl:*)",
       "Bash(npx tsc:*)",
       "Bash(npm run:*)",
-      "Bash(bunx tsc:*)"
+      "Bash(bunx tsc:*)",
+      "Bash(find /d/ฝึกงาน/engenius-project/apps/api/src -type f -name *.ts)",
+      "Bash(bunx drizzle-kit:*)"
     ]
   }
 }

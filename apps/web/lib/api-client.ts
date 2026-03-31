@@ -3,13 +3,17 @@
  * Connects to Backend API (ElysiaJS)
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+if (!API_URL) {
+  console.error("Missing NEXT_PUBLIC_API_URL environment variable.");
+}
 
 class ApiClient {
   private baseUrl: string;
 
-  constructor(baseUrl: string = API_URL) {
-    this.baseUrl = baseUrl;
+  constructor(baseUrl: string = API_URL as string) {
+    this.baseUrl = baseUrl || "";
   }
 
   /**
@@ -49,7 +53,7 @@ class ApiClient {
   /**
    * POST request
    */
-  async post<T>(endpoint: string, data?: any): Promise<T> {
+  async post<T>(endpoint: string, data?: unknown): Promise<T> {
     return this.request<T>(endpoint, {
       method: 'POST',
       body: JSON.stringify(data),
@@ -59,16 +63,13 @@ class ApiClient {
   /**
    * PUT request
    */
-  async put<T>(endpoint: string, data?: any): Promise<T> {
+  async put<T>(endpoint: string, data?: unknown): Promise<T> {
     return this.request<T>(endpoint, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
   }
 
-  /**
-   * DELETE request
-   */
   async delete<T>(endpoint: string, options?: RequestInit): Promise<T> {
     return this.request<T>(endpoint, { ...options, method: 'DELETE' });
   }
@@ -77,76 +78,50 @@ class ApiClient {
 // Export singleton instance
 export const apiClient = new ApiClient();
 
+import { User, LoginResponse, ApiResponse } from "@/types/user.types";
+import { Payment, CreatePaymentRequest } from "@/types/payment.types";
+
 /**
  * API Service - Specific API calls
  */
 export const apiService = {
-  // Health check
-  healthCheck: () => apiClient.get<{ message: string; status: string }>('/'),
+  get: <T>(endpoint: string) => apiClient.get<ApiResponse<T>>(endpoint),
 
-  // Auth APIs
-  requestOTP: (email: string) =>
-    apiClient.post<any>('/auth/request-otp', { email }),
+  healthCheck: () => apiClient.get<ApiResponse<{ message: string; status: string }>>('/'),
 
-  loginWithOTP: (email: string, otp: string) =>
-    apiClient.post<any>('/auth/login', { email, otp }),
+  login: (email: string, password: string) =>
+    apiClient.post<ApiResponse<LoginResponse>>('/auth/login', { email, password }),
 
   logout: (userId: string) =>
-    apiClient.post<any>('/auth/logout', { userId }),
+    apiClient.post<ApiResponse<{ success: boolean }>>('/auth/logout', { userId }),
 
   verifyToken: (token: string) =>
-    apiClient.get<any>('/auth/verify', {
+    apiClient.get<ApiResponse<User>>('/auth/verify', {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     }),
 
-  // User APIs
-  getUsers: (limit = 100, offset = 0) =>
-    apiClient.get<any>(`/users?limit=${limit}&offset=${offset}`),
+  searchUserByEmail: (email: string) =>
+    apiClient.get<ApiResponse<User>>(`/users/email/${encodeURIComponent(email)}`),
 
-  getUserById: (id: string) =>
-    apiClient.get<any>(`/users/${id}`),
-
-  getUserByEmail: (email: string) =>
-    apiClient.get<any>(`/users/email/${email}`),
-
-  createUser: (userData: any) =>
-    apiClient.post<any>('/users', userData),
-
-  updateUser: (id: string, userData: any) =>
-    apiClient.put<any>(`/users/${id}`, userData),
-
-  deleteUser: (id: string) =>
-    apiClient.delete<any>(`/users/${id}`),
-
-  verifyOtp: (otp: string) =>
-    apiClient.post<any>('/users/verify-otp', { otp }),
-
-  checkMembership: (id: string) =>
-    apiClient.get<any>(`/users/${id}/membership`),
-
-  // Payment APIs
-  getPayments: () =>
-    apiClient.get<any>('/payments'),
-
-  getPaymentById: (id: number) =>
-    apiClient.get<any>(`/payments/${id}`),
+  getAllUsers: (limit = 100, offset = 0) =>
+    apiClient.get<ApiResponse<User[]>>(`/users?limit=${limit}&offset=${offset}`),
 
   getUserPayments: (userId: string) =>
-    apiClient.get<any>(`/payments/user/${userId}`),
+    apiClient.get<ApiResponse<Payment[]>>(`/payments/user/${userId}`),
 
-  getPendingPayments: () =>
-    apiClient.get<any>('/payments/pending'),
+  getAllPayments: (limit = 100, offset = 0) =>
+    apiClient.get<ApiResponse<Payment[]>>(`/payments?limit=${limit}&offset=${offset}`),
 
-  createPayment: (paymentData: any) =>
-    apiClient.post<any>('/payments', paymentData),
+  getPaymentById: (id: number) =>
+    apiClient.get<ApiResponse<Payment>>(`/payments/${id}`),
 
-  updatePaymentStatus: (id: number, status: boolean) =>
-    apiClient.put<any>(`/payments/${id}/status`, { status }),
+  createPayment: (data: CreatePaymentRequest) =>
+    apiClient.post<ApiResponse<Payment>>('/payments', data),
 
-  activatePayment: (code: string) =>
-    apiClient.post<any>('/payments/activate', { code }),
+  updatePaymentStatus: (id: number, status: string | boolean) =>
+    apiClient.put<ApiResponse<Payment>>(`/payments/${id}/status`, { status }),
 };
 
 export default apiClient;

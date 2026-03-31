@@ -2,6 +2,18 @@
  * User Types for Frontend
  */
 
+export type UserRole = 'user' | 'admin';
+
+export interface Subject {
+  id: string;
+  name: string;
+  sheets: string[];
+}
+
+export interface ExaminationFields {
+  [key: string]: string | number | boolean | null | undefined;
+}
+
 export interface User {
   id: string;
   firstname: string | null;
@@ -10,20 +22,20 @@ export interface User {
   phone: string | null;
   university: string | null;
   department: string | null;
-  exp: Date | null;
-  expKorpor: Date | null;
-  expOtp: Date | null;
-  subject: any;
-  role: string[];
-  createdAt: Date;
-  updatedAt: Date;
+  exp: string | null;
+  expKorpor: string | null;
+  expOtp: string | null;
+  subject: Subject | null;
+  role: UserRole[];
+  createdAt: string;
+  updatedAt: string;
   time: number;
   activated: boolean;
   otp: string | null;
-  examinationFields: any;
+  examinationFields: ExaminationFields | null;
   token: string | null;
   profile: string | null;
-  deletedAt: Date | null;
+  deletedAt: string | null;
 }
 
 export interface LoginRequest {

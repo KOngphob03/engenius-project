@@ -1,6 +1,6 @@
 "use client";
 
-import { use } from "react";
+import { useState, useEffect, useCallback, use } from "react";
 import {
   ArrowLeft,
   User,
@@ -10,64 +10,52 @@ import {
   Clock,
   Receipt,
   Phone,
+  AlertCircle,
+  X,
+  LogOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { apiService } from "@/lib/api-client";
 
-// Mock customer data
-const mockCustomerData: Record<
-  string,
-  {
-    name: string;
-    branch: string;
-    phone: string;
-  }
-> = {
-  "cust-001": {
-    name: "นายอดุลวิทย์ ชินาภาษ",
-    branch: "สำนักงานใหญ่",
-    phone: "081-234-5678",
-  },
-  "cust-002": {
-    name: "นางสมศรี มั่งมีศรีสุข",
-    branch: "สาขาเชียงใหม่",
-    phone: "089-876-5432",
-  },
-  "cust-003": {
-    name: "นางสาวปราณี วิชัยดิษฐ",
-    branch: "สาขาภูเก็ต",
-    phone: "062-345-6789",
-  },
-};
+/* ── Toast notification ── */
+function Toast({
+  message,
+  type = "error",
+  onClose,
+}: {
+  message: string;
+  type?: "error" | "success";
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 4000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
 
-// Mock transactions
-const mockTransactions = [
-  {
-    id: "txn-001",
-    date: "28 มี.ค. 2026",
-    time: "14:32:00 น.",
-    amount: 12500.0,
-  },
-  {
-    id: "txn-002",
-    date: "15 มี.ค. 2026",
-    time: "09:15:00 น.",
-    amount: 8750.5,
-  },
-  {
-    id: "txn-003",
-    date: "02 มี.ค. 2026",
-    time: "16:48:00 น.",
-    amount: 23100.0,
-  },
-  {
-    id: "txn-004",
-    date: "18 ก.พ. 2026",
-    time: "11:20:00 น.",
-    amount: 5430.75,
-  },
-];
+  const bgColor = type === "error" ? "bg-red-50" : "bg-green-50";
+  const textColor = type === "error" ? "text-red-500" : "text-green-500";
+  const borderColor = type === "error" ? "border-red-100" : "border-green-100";
+
+  return (
+    <div className="fixed top-6 left-1/2 z-50 -translate-x-1/2 animate-[toastIn_0.35s_cubic-bezier(.21,1.02,.73,1)]">
+      <div className={`flex items-center gap-3 rounded-xl border ${borderColor} bg-white px-5 py-3 shadow-lg`}>
+        <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${bgColor}`}>
+          <AlertCircle className={`h-4 w-4 ${textColor}`} />
+        </div>
+        <span className="text-sm font-medium text-gray-700">{message}</span>
+        <button
+          onClick={onClose}
+          className="ml-2 rounded-md p-0.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("th-TH", {
@@ -77,32 +65,148 @@ function formatCurrency(amount: number) {
   }).format(amount);
 }
 
+function formatDate(dateString: string | Date) {
+  const date = new Date(dateString);
+  const thaiDay = date.getDate();
+  const thaiMonth = date.toLocaleString("th-TH", { month: "short" });
+  const thaiYear = date.getFullYear() + 543; // Convert to Buddhist year
+  return `${thaiDay} ${thaiMonth} ${thaiYear}`;
+}
+
+function formatTime(dateString: string | Date) {
+  const date = new Date(dateString);
+  return date.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+}
+
+interface Payment {
+  id: number;
+  amount: number;
+  status: boolean;
+  activateCode: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export default function TransactionHistoryPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const router = useRouter();
   const { id } = use(params);
 
-  const customer = mockCustomerData[id] ?? {
-    name: "นายอดุลวิทย์ ชินาภาษ",
-    branch: "สำนักงานใหญ่",
-    phone: "081-234-5678",
+  const [user, setUser] = useState<User>(null);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [toast, setToast] = useState<{ message: string; type?: "error" | "success" } | null>(null);
+
+  const clearToast = useCallback(() => setToast(null), []);
+
+  // Load user and payments data
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true);
+
+      try {
+        // Load user data by email/id (id is email from search page)
+        const userResponse = await apiService.get(`/users/email/${id}`);
+        if (userResponse.error || !userResponse.data) {
+          setToast({ message: "ไม่พบข้อมูลลูกค้า", type: "error" });
+          setIsLoading(false);
+          return;
+        }
+
+        setUser(userResponse.data);
+
+        // Load payments data
+        const paymentsResponse = await apiService.getUserPayments(userResponse.data.id);
+        if (paymentsResponse.data) {
+          const paymentData = Array.isArray(paymentsResponse.data) ? paymentsResponse.data : [paymentsResponse.data];
+          setPayments(paymentData);
+        }
+      } catch (error: unknown) {
+        setToast({ message: (error as Error).message || "เกิดข้อผิดพลาดในการโหลดข้อมูล", type: "error" });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, [id]);
+
+  const handleLogout = () => {
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("user");
+    router.push("/login");
   };
+
+  if (isLoading) {
+    return (
+      <div className="relative min-h-screen bg-[#F8FAFC]">
+        <header className="sticky top-0 z-10 border-b border-gray-100 bg-white/80 backdrop-blur-lg">
+          <div className="mx-auto flex h-14 max-w-4xl items-center px-4">
+            <Link href="/dashboard" className="group flex items-center gap-2">
+              <h1 className="text-xl font-extrabold tracking-tight text-[#800000]">Engenius</h1>
+            </Link>
+          </div>
+        </header>
+        <div className="flex flex-col items-center justify-center py-32">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-[#007BFF]" />
+          <p className="mt-3 text-sm text-gray-400">กำลังโหลดข้อมูล...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="relative min-h-screen bg-[#F8FAFC]">
+        {toast && <Toast message={toast.message} type={toast.type} onClose={clearToast} />}
+        <header className="sticky top-0 z-10 border-b border-gray-100 bg-white/80 backdrop-blur-lg">
+          <div className="mx-auto flex h-14 max-w-4xl items-center px-4">
+            <Link href="/search" className="group flex items-center gap-2">
+              <h1 className="text-xl font-extrabold tracking-tight text-[#800000]">Engenius</h1>
+            </Link>
+          </div>
+        </header>
+        <div className="flex flex-col items-center justify-center py-32">
+          <p className="text-gray-500">ไม่พบข้อมูลลูกค้า</p>
+          <Link href="/search">
+            <Button className="mt-4">กลับไปหน้าค้นหา</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const totalAmount = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
 
   return (
     <div className="relative min-h-screen bg-[#F8FAFC]">
+      {/* Toast */}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={clearToast} />}
+
       {/* Top Bar */}
       <header className="sticky top-0 z-10 border-b border-gray-100 bg-white/80 backdrop-blur-lg">
-        <div className="mx-auto flex h-14 max-w-4xl items-center px-4">
-          <Link href="/login" className="group flex items-center gap-2">
+        <div className="mx-auto flex h-14 max-w-4xl items-center justify-between px-4">
+          <Link href="/dashboard" className="group flex items-center gap-2">
             <h1 className="text-xl font-extrabold tracking-tight text-[#800000] transition-opacity group-hover:opacity-80">
               Engenius
             </h1>
           </Link>
-          <span className="ml-3 rounded-full bg-[#007BFF]/10 px-2.5 py-0.5 text-xs font-semibold text-[#007BFF]">
-            Admin
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="rounded-full bg-[#007BFF]/10 px-2.5 py-0.5 text-xs font-semibold text-[#007BFF]">
+              Admin
+            </span>
+            <Button
+              onClick={handleLogout}
+              variant="ghost"
+              size="sm"
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -130,17 +234,19 @@ export default function TransactionHistoryPage({
               {/* Details */}
               <div className="flex flex-col gap-2">
                 <h2 className="text-xl font-bold text-gray-900">
-                  {customer.name}
+                  {user.firstname} {user.lastname}
                 </h2>
                 <div className="flex flex-wrap gap-4 text-sm text-gray-500">
                   <span className="inline-flex items-center gap-1.5">
                     <Building2 className="h-3.5 w-3.5" />
-                    {customer.branch}
+                    {user.department || user.university || "-"}
                   </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <Phone className="h-3.5 w-3.5" />
-                    {customer.phone}
-                  </span>
+                  {user.phone && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Phone className="h-3.5 w-3.5" />
+                      {user.phone}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -153,57 +259,63 @@ export default function TransactionHistoryPage({
             <Receipt className="h-5 w-5 text-gray-400" />
             <h3 className="text-lg font-bold text-gray-900">รายการชำระเงิน</h3>
             <span className="ml-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
-              {mockTransactions.length} รายการ
+              {payments.length} รายการ
             </span>
           </div>
 
           {/* Transaction List */}
           <div className="space-y-3">
-            {mockTransactions.map((txn, index) => (
-              <Card
-                key={txn.id}
-                id={`transaction-${txn.id}`}
-                className="group border-0 p-0 shadow-sm transition-all duration-200 hover:shadow-md"
-                style={{
-                  animationDelay: `${0.2 + index * 0.08}s`,
-                  animation: "fadeIn 0.4s ease-out both",
-                }}
-              >
-                <CardContent className="p-0">
-                  <div className="flex items-center gap-4 px-5 py-4">
-                    {/* Date & Time Info */}
-                    <div className="flex flex-1 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-6">
-                      <div className="flex items-center gap-2 text-sm text-gray-700">
-                        <Calendar className="h-4 w-4 text-gray-400" />
-                        <span className="font-medium">{txn.date}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-500">
-                        <Clock className="h-3.5 w-3.5 text-gray-400" />
-                        <span>{txn.time}</span>
-                      </div>
-                    </div>
-
-                    {/* Amount */}
-                    <div className="text-right">
-                      <p className="text-base font-bold text-gray-900 tabular-nums">
-                        {formatCurrency(txn.amount)}
-                      </p>
-                    </div>
-
-                    {/* Print Button → Navigate to Invoice */}
-                    <Link href={`/invoice/${txn.id}`}>
-                      <Button
-                        id={`print-${txn.id}`}
-                        className="ml-2 h-9 gap-1.5 rounded-lg bg-[#007BFF] px-4 text-xs font-semibold text-white shadow-md shadow-[#007BFF]/20 transition-all duration-200 hover:bg-blue-700 hover:shadow-lg hover:shadow-[#007BFF]/30 active:scale-[0.97]"
-                      >
-                        <Printer className="h-3.5 w-3.5" />
-                        พิมพ์
-                      </Button>
-                    </Link>
-                  </div>
-                </CardContent>
+            {payments.length === 0 ? (
+              <Card className="border-0 p-8 text-center shadow-sm">
+                <p className="text-gray-500">ไม่มีรายการชำระเงิน</p>
               </Card>
-            ))}
+            ) : (
+              payments.map((payment, index) => (
+                <Card
+                  key={payment.id}
+                  id={`transaction-${payment.id}`}
+                  className="group border-0 p-0 shadow-sm transition-all duration-200 hover:shadow-md"
+                  style={{
+                    animationDelay: `${0.2 + index * 0.08}s`,
+                    animation: "fadeIn 0.4s ease-out both",
+                  }}
+                >
+                  <CardContent className="p-0">
+                    <div className="flex items-center gap-4 px-5 py-4">
+                      {/* Date & Time Info */}
+                      <div className="flex flex-1 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-6">
+                        <div className="flex items-center gap-2 text-sm text-gray-700">
+                          <Calendar className="h-4 w-4 text-gray-400" />
+                          <span className="font-medium">{formatDate(payment.createdAt)}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                          <Clock className="h-3.5 w-3.5 text-gray-400" />
+                          <span>{formatTime(payment.createdAt)} น.</span>
+                        </div>
+                      </div>
+
+                      {/* Amount */}
+                      <div className="text-right">
+                        <p className="text-base font-bold text-gray-900 tabular-nums">
+                          {formatCurrency(payment.amount)}
+                        </p>
+                      </div>
+
+                      {/* Print Button → Navigate to Invoice */}
+                      <Link href={`/invoice/${payment.id}`}>
+                        <Button
+                          id={`print-${payment.id}`}
+                          className="ml-2 h-9 gap-1.5 rounded-lg bg-[#007BFF] px-4 text-xs font-semibold text-white shadow-md shadow-[#007BFF]/20 transition-all duration-200 hover:bg-blue-700 hover:shadow-lg hover:shadow-[#007BFF]/30 active:scale-[0.97]"
+                        >
+                          <Printer className="h-3.5 w-3.5" />
+                          พิมพ์
+                        </Button>
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
           </div>
 
           {/* Summary */}
@@ -214,9 +326,7 @@ export default function TransactionHistoryPage({
                   ยอดรวมทั้งหมด
                 </span>
                 <span className="text-xl font-bold text-gray-900 tabular-nums">
-                  {formatCurrency(
-                    mockTransactions.reduce((sum, t) => sum + t.amount, 0),
-                  )}
+                  {formatCurrency(totalAmount)}
                 </span>
               </div>
             </CardContent>

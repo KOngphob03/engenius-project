@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Mail, Lock, LogIn, Eye, EyeOff, AlertCircle, X, ArrowLeft } from "lucide-react";
+import { Mail, Lock, LogIn, Eye, EyeOff, AlertCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -62,73 +62,43 @@ function Toast({
   );
 }
 
+
 /* ── Main page ── */
 export default function LoginPage() {
   const router = useRouter();
-  const [step, setStep] = useState<"email" | "otp">("email");
   const [email, setEmail] = useState("");
-  const [otp, setOtp] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [requestedEmail, setRequestedEmail] = useState("");
 
-  const [errors, setErrors] = useState<{ email?: string; otp?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>(
+    {}
+  );
   const [toast, setToast] = useState<{ message: string; type?: "error" | "success" } | null>(null);
 
   const clearToast = useCallback(() => setToast(null), []);
 
-  /* Request OTP */
-  const handleRequestOTP = async (e: React.FormEvent) => {
+  /* validate & submit */
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const newErrors: { email?: string; password?: string } = {};
 
     if (!email.trim()) {
-      setErrors({ email: "กรุณากรอกอีเมล" });
-      setToast({ message: "กรุณากรอกอีเมล", type: "error" });
-      return;
+      newErrors.email = "กรุณากรอกอีเมล";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      newErrors.email = "รูปแบบอีเมลไม่ถูกต้อง";
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setErrors({ email: "รูปแบบอีเมลไม่ถูกต้อง" });
-      setToast({ message: "รูปแบบอีเมลไม่ถูกต้อง", type: "error" });
-      return;
+    if (!password) {
+      newErrors.password = "กรุณากรอกรหัสผ่าน";
+    } else if (password.length < 6) {
+      newErrors.password = "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร";
     }
 
-    setErrors({});
-    setToast(null);
-    setIsLoading(true);
-
-    try {
-      const response = await apiService.requestOTP(email);
-
-      if (response.error) {
-        setToast({ message: response.error, type: "error" });
-      } else if (response.data) {
-        setRequestedEmail(email);
-        setStep("otp");
-        setToast({
-          message: `OTP ถูกส่งไปยัง ${email}${response.data.otp ? ` (OTP: ${response.data.otp})` : ""}`,
-          type: "success",
-        });
-      }
-    } catch (error: any) {
-      setToast({ message: error.message || "เกิดข้อผิดพลาด", type: "error" });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  /* Login with OTP */
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!otp.trim()) {
-      setErrors({ otp: "กรุณากรอกรหัส OTP" });
-      setToast({ message: "กรุณากรอกรหัส OTP", type: "error" });
-      return;
-    }
-
-    if (otp.length !== 6) {
-      setErrors({ otp: "OTP ต้องมี 6 ตัวอักษร" });
-      setToast({ message: "OTP ต้องมี 6 ตัวอักษร", type: "error" });
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      setToast({ message: "กรุณากรอกข้อมูลให้ครบถ้วน", type: "error" });
       return;
     }
 
@@ -137,12 +107,12 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const response = await apiService.loginWithOTP(requestedEmail, otp);
+      const response = await apiService.login(email, password);
 
       if (response.error) {
         setToast({ message: response.error, type: "error" });
       } else if (response.data) {
-        // Store token in localStorage (in production, use httpOnly cookies)
+        // Store token in localStorage
         localStorage.setItem("auth_token", response.data.token);
         localStorage.setItem("user", JSON.stringify(response.data.user));
 
@@ -151,41 +121,26 @@ export default function LoginPage() {
         // Redirect to dashboard after successful login
         setTimeout(() => {
           router.push("/dashboard");
-        }, 1000);
+        }, 500);
       }
-    } catch (error: any) {
-      setToast({ message: error.message || "เกิดข้อผิดพลาดในการเข้าสู่ระบบ", type: "error" });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "เกิดข้อผิดพลาดในการเข้าสู่ระบบ";
+      setToast({ message, type: "error" });
     } finally {
       setIsLoading(false);
     }
   };
 
-  /* Go back to email step */
-  const handleBackToEmail = () => {
-    setStep("email");
-    setOtp("");
-    setErrors({});
+  /* clear field error on change */
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEmail(e.target.value);
+    if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
   };
 
-  /* Resend OTP */
-  const handleResendOTP = async () => {
-    setIsLoading(true);
-    try {
-      const response = await apiService.requestOTP(requestedEmail);
-
-      if (response.error) {
-        setToast({ message: response.error, type: "error" });
-      } else if (response.data) {
-        setToast({
-          message: `ส่ง OTP ใหม่แล้ว${response.data.otp ? ` (OTP: ${response.data.otp})` : ""}`,
-          type: "success",
-        });
-      }
-    } catch (error: any) {
-      setToast({ message: error.message || "เกิดข้อผิดพลาด", type: "error" });
-    } finally {
-      setIsLoading(false);
-    }
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPassword(e.target.value);
+    if (errors.password)
+      setErrors((prev) => ({ ...prev, password: undefined }));
   };
 
   return (
@@ -213,197 +168,137 @@ export default function LoginPage() {
 
             <div className="mt-4 text-center">
               <CardTitle className="text-xl font-bold text-gray-800">
-                {step === "email" ? "เข้าสู่ระบบ (Admin)" : "กรอกรหัส OTP"}
+                เข้าสู่ระบบ
               </CardTitle>
               <CardDescription className="mt-1.5 text-sm text-gray-500">
-                {step === "email"
-                  ? "กรุณากรอกอีเมลเพื่อรับรหัส OTP"
-                  : `กรอกรหัส OTP ที่ส่งไปยัง ${requestedEmail}`}
+                กรุณากรอกอีเมลและรหัสผ่านเพื่อเข้าสู่ระบบ
               </CardDescription>
             </div>
           </CardHeader>
 
           <CardContent className="pt-4 pb-10">
-            {/* Step 1: Email Input */}
-            {step === "email" && (
-              <form onSubmit={handleRequestOTP} noValidate className="flex flex-col gap-5">
-                {/* Email Field */}
-                <div className="group relative">
-                  <label
-                    htmlFor="login-email"
-                    className="mb-1.5 block text-sm font-medium text-gray-700"
-                  >
-                    อีเมล
-                  </label>
-                  <div className="relative">
-                    <Mail
-                      className={`pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transition-colors ${
-                        errors.email
-                          ? "text-red-400"
-                          : "text-gray-400 group-focus-within:text-[#007BFF]"
-                      }`}
-                    />
-                    <Input
-                      id="login-email"
-                      type="email"
-                      placeholder="admin@engenius.co.th"
-                      value={email}
-                      onChange={(e) => {
-                        setEmail(e.target.value);
-                        if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
-                      }}
-                      className={`h-11 pl-10 text-sm transition-all duration-200 ${
-                        errors.email
-                          ? "border-red-300 focus-visible:ring-red-200 focus-visible:border-red-400"
-                          : "focus-visible:ring-[#007BFF]/30 focus-visible:border-[#007BFF]"
-                      }`}
-                    />
-                  </div>
-                  <FieldError message={errors.email} />
-                </div>
-
-                {/* Submit Button */}
-                <Button
-                  type="submit"
-                  disabled={isLoading}
-                  className="mt-2 h-11 w-full bg-[#007BFF] text-white text-sm font-semibold shadow-lg shadow-[#007BFF]/25 transition-all duration-200 hover:bg-blue-700 hover:shadow-xl hover:shadow-[#007BFF]/30 active:scale-[0.98] disabled:opacity-70"
+            {/* noValidate prevents the ugly browser tooltip */}
+            <form
+              onSubmit={handleSubmit}
+              noValidate
+              className="flex flex-col gap-5"
+            >
+              {/* Email Field */}
+              <div className="group relative">
+                <label
+                  htmlFor="login-email"
+                  className="mb-1.5 block text-sm font-medium text-gray-700"
                 >
-                  {isLoading ? (
-                    <span className="flex items-center gap-2">
-                      <svg
-                        className="h-4 w-4 animate-spin"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                        />
-                      </svg>
-                      กำลังส่ง OTP...
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      <LogIn className="h-4 w-4" />
-                      ขอรหัส OTP
-                    </span>
-                  )}
-                </Button>
-              </form>
-            )}
-
-            {/* Step 2: OTP Input */}
-            {step === "otp" && (
-              <form onSubmit={handleLogin} noValidate className="flex flex-col gap-5">
-                {/* OTP Field */}
-                <div className="group relative">
-                  <label
-                    htmlFor="login-otp"
-                    className="mb-1.5 block text-sm font-medium text-gray-700"
-                  >
-                    รหัส OTP (6 ตัว)
-                  </label>
-                  <div className="relative">
-                    <Lock
-                      className={`pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transition-colors ${
-                        errors.otp
-                          ? "text-red-400"
-                          : "text-gray-400 group-focus-within:text-[#007BFF]"
-                      }`}
-                    />
-                    <Input
-                      id="login-otp"
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      placeholder="123456"
-                      maxLength={6}
-                      value={otp}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/\D/g, "");
-                        setOtp(value);
-                        if (errors.otp) setErrors((prev) => ({ ...prev, otp: undefined }));
-                      }}
-                      className={`h-11 pl-10 text-sm tracking-widest transition-all duration-200 ${
-                        errors.otp
-                          ? "border-red-300 focus-visible:ring-red-200 focus-visible:border-red-400"
-                          : "focus-visible:ring-[#007BFF]/30 focus-visible:border-[#007BFF]"
-                      }`}
-                    />
-                  </div>
-                  <FieldError message={errors.otp} />
+                  อีเมล
+                </label>
+                <div className="relative">
+                  <Mail
+                    className={`pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transition-colors ${
+                      errors.email
+                        ? "text-red-400"
+                        : "text-gray-400 group-focus-within:text-[#007BFF]"
+                    }`}
+                  />
+                  <Input
+                    id="login-email"
+                    type="email"
+                    placeholder="your email"
+                    value={email}
+                    onChange={handleEmailChange}
+                    autoComplete="email"
+                    className={`h-11 pl-10 text-sm transition-all duration-200 ${
+                      errors.email
+                        ? "border-red-300 focus-visible:ring-red-200 focus-visible:border-red-400"
+                        : "focus-visible:ring-[#007BFF]/30 focus-visible:border-[#007BFF]"
+                    }`}
+                  />
                 </div>
+                <FieldError message={errors.email} />
+              </div>
 
-                {/* Resend OTP Link */}
-                <div className="text-center">
+              {/* Password Field */}
+              <div className="group relative">
+                <label
+                  htmlFor="login-password"
+                  className="mb-1.5 block text-sm font-medium text-gray-700"
+                >
+                  รหัสผ่าน
+                </label>
+                <div className="relative">
+                  <Lock
+                    className={`pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transition-colors ${
+                      errors.password
+                        ? "text-red-400"
+                        : "text-gray-400 group-focus-within:text-[#007BFF]"
+                    }`}
+                  />
+                  <Input
+                    id="login-password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••"
+                    value={password}
+                    onChange={handlePasswordChange}
+                    className={`h-11 pl-10 pr-10 text-sm transition-all duration-200 ${
+                      errors.password
+                        ? "border-red-300 focus-visible:ring-red-200 focus-visible:border-red-400"
+                        : "focus-visible:ring-[#007BFF]/30 focus-visible:border-[#007BFF]"
+                    }`}
+                  />
                   <button
                     type="button"
-                    onClick={handleResendOTP}
-                    disabled={isLoading}
-                    className="text-sm text-[#007BFF] hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    tabIndex={-1}
+                    aria-label={showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
                   >
-                    ส่งรหัส OTP ใหม่
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
                   </button>
                 </div>
+                <FieldError message={errors.password} />
+              </div>
 
-                {/* Back Button */}
-                <Button
-                  type="button"
-                  onClick={handleBackToEmail}
-                  variant="outline"
-                  className="h-11 w-full"
-                >
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  กลับไปกรอกอีเมล
-                </Button>
-
-                {/* Submit Button */}
-                <Button
-                  type="submit"
-                  disabled={isLoading}
-                  className="mt-2 h-11 w-full bg-[#007BFF] text-white text-sm font-semibold shadow-lg shadow-[#007BFF]/25 transition-all duration-200 hover:bg-blue-700 hover:shadow-xl hover:shadow-[#007BFF]/30 active:scale-[0.98] disabled:opacity-70"
-                >
-                  {isLoading ? (
-                    <span className="flex items-center gap-2">
-                      <svg
-                        className="h-4 w-4 animate-spin"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                        />
-                      </svg>
-                      กำลังตรวจสอบ...
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      <LogIn className="h-4 w-4" />
-                      เข้าสู่ระบบ
-                    </span>
-                  )}
-                </Button>
-              </form>
-            )}
+              {/* Submit Button */}
+              <Button
+                id="login-submit"
+                type="submit"
+                disabled={isLoading}
+                className="mt-2 h-11 w-full bg-[#007BFF] text-white text-sm font-semibold shadow-lg shadow-[#007BFF]/25 transition-all duration-200 hover:bg-blue-700 hover:shadow-xl hover:shadow-[#007BFF]/30 active:scale-[0.98] disabled:opacity-70"
+              >
+                {isLoading ? (
+                  <span className="flex items-center gap-2">
+                    <svg
+                      className="h-4 w-4 animate-spin"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                      />
+                    </svg>
+                    กำลังเข้าสู่ระบบ...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <LogIn className="h-4 w-4" />
+                    เข้าสู่ระบบ
+                  </span>
+                )}
+              </Button>
+            </form>
           </CardContent>
         </Card>
 
