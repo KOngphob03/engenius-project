@@ -13,7 +13,6 @@
 
 ```txt
 my-project/
-
 ├─ .gitignore
 ├─ docker-compose.yml
 ├─ README.md
@@ -108,7 +107,6 @@ NEXT_PUBLIC_API_URL=http://localhost:3001
 ```
 
 > หมายเหตุ:
->
 > - ฝั่ง `web` ใช้ port `3000`
 > - ฝั่ง `api` ใช้ port `3001`
 
@@ -126,7 +124,6 @@ bun dev
 ```
 
 เข้าใช้งาน:
-
 - Web: http://localhost:3000
 
 ### Terminal 2: รัน Elysia
@@ -137,7 +134,6 @@ bun dev
 ```
 
 เข้าใช้งาน:
-
 - API root: http://localhost:3001
 - Health check: http://localhost:3001/api/health
 
@@ -209,15 +205,12 @@ docker compose logs -f
 ## 10) Docker ที่เกี่ยวข้อง
 
 ### `apps/web/Dockerfile`
-
 ใช้สำหรับ build และ run Next.js แบบ production
 
 ### `apps/api/Dockerfile`
-
 ใช้สำหรับ build และ run Elysia แบบ production
 
 ### `docker-compose.yml`
-
 ใช้รวม service ของ `web` และ `api` ให้สั่งงานพร้อมกันได้
 
 ---
@@ -378,14 +371,12 @@ refactor: separate api routes
 ## 18) กติกาการ push
 
 ### ควรทำ
-
 - push ขึ้น branch ตัวเองเท่านั้น
 - ทดสอบก่อน push
 - เขียน commit message ให้ชัด
 - เปิด PR เข้า `dev` ก่อนเสมอ
 
 ### ห้ามทำ
-
 - ห้าม push ตรงเข้า `main`
 - ห้ามแก้ branch คนอื่นโดยไม่คุยก่อน
 - ห้าม merge เข้า `main` โดยไม่ review
@@ -397,13 +388,11 @@ refactor: separate api routes
 แนะนำให้ตั้งค่าบน GitHub ดังนี้
 
 ### Protect branch `main`
-
 - Require pull request before merging
 - Require approvals
 - Block force push
 
 ### Protect branch `dev`
-
 - Require pull request before merging
 
 ---
@@ -432,19 +421,15 @@ apps/api
 ## 21) ปัญหาที่พบบ่อย
 
 ### 1. Port ชนกัน
-
 ถ้า `3000` หรือ `3001` ถูกใช้งานอยู่ ให้หยุด process เดิมก่อน หรือเปลี่ยน port ใน config
 
 ### 2. Web เรียก API ไม่ได้
-
 ตรวจสอบว่า
-
 - API รันอยู่จริง
 - `apps/web/.env.local` ถูกต้อง
 - CORS ถูกตั้งค่าแล้ว
 
 ### 3. Docker build ไม่ผ่าน
-
 ลอง rebuild ใหม่
 
 ```bash
@@ -454,7 +439,6 @@ docker compose up
 ```
 
 ### 4. ติดตั้ง package แล้วลืม commit lockfile
-
 ให้ commit ไฟล์ lock มาด้วยทุกครั้ง
 
 ---
